@@ -29,9 +29,10 @@ Locally (any token with `read:packages` works, e.g. `gh auth token`):
 # against GitHub Packages
 GITHUB_ACTOR=<user> GITHUB_TOKEN=$(gh auth token) ./gradlew test -PbmcVersion=0.1.0
 
-# against a local build of the main repo
+# against a local build of the main repo (untagged builds version themselves
+# 0.0.1-local - the release TAG is the only version source over there)
 (cd ../bmc4j && ./gradlew -p core publishToMavenLocal)
-./gradlew test
+./gradlew test -PbmcVersion=0.0.1-local
 ```
 
 `mavenLocal` is first in the repository order, so a locally published snapshot
