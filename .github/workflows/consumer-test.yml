@@ -1,0 +1,50 @@
+name: Consumer test
+
+# Manual dispatch only (until the org repos go public). Pulls the requested bmc4j
+# version BY COORDINATES from GitHub Packages and runs the consumer proofs on all
+# three OS families - the "does the published product actually install and work"
+# test. Both proofs pass when the product is healthy (the deliberate bug declares
+# expect = REFUTED), so a green `gradlew test` is the whole assertion.
+#
+# Requires the BMC4J_PACKAGES_TOKEN repo secret (a PAT with read:packages; plus
+# repo scope while bmc4j/bmc4j is private) - GitHub Packages requires a token for
+# Maven reads even on public repos.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'bmc4j version to consume (e.g. 0.1.0 or 0.1.0-rc.1)'
+        required: true
+        default: '0.1.0'
+
+permissions:
+  contents: read
+
+jobs:
+  consume:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Consume bmc4j ${{ inputs.version }} and run the proofs
+        shell: bash
+        env:
+          BMC4J_PACKAGES_TOKEN: ${{ secrets.BMC4J_PACKAGES_TOKEN }}
+        run: ./gradlew test -PbmcVersion=${{ inputs.version }} --no-daemon
