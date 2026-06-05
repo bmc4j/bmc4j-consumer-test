@@ -1,14 +1,14 @@
 name: Consumer test
 
-# Manual dispatch only (until the org repos go public). Pulls the requested bmc4j
-# version BY COORDINATES from GitHub Packages and runs the consumer proofs on all
-# three OS families - the "does the published product actually install and work"
-# test. Both proofs pass when the product is healthy (the deliberate bug declares
-# expect = REFUTED), so a green `gradlew test` is the whole assertion.
+# Pulls the requested bmc4j version BY COORDINATES from GitHub Packages and runs
+# the consumer proofs on all three OS families - the "does the published product
+# actually install and work" test. Both proofs pass when the product is healthy
+# (the deliberate bug declares expect = REFUTED), so a green `gradlew test` is the
+# whole assertion.
 #
-# Requires the BMC4J_PACKAGES_TOKEN repo secret (a PAT with read:packages; plus
-# repo scope while bmc4j/bmc4j is private) - GitHub Packages requires a token for
-# Maven reads even on public repos.
+# No PAT needed: GitHub Packages requires SOME authenticated token for Maven reads
+# even on public packages, but for a PUBLIC repo's packages ANY token with
+# packages:read works - including this workflow's own GITHUB_TOKEN.
 
 on:
   workflow_dispatch:
@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   consume:
@@ -46,5 +47,6 @@ jobs:
       - name: Consume bmc4j ${{ inputs.version }} and run the proofs
         shell: bash
         env:
-          BMC4J_PACKAGES_TOKEN: ${{ secrets.BMC4J_PACKAGES_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew test -PbmcVersion=${{ inputs.version }} --no-daemon

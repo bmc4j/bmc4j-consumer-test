@@ -2,9 +2,10 @@
 // no project substitution. This repo exists to prove the published artifacts
 // install and work the way a stranger's build would experience them.
 //
-// Repositories: GitHub Packages (the pre-Central channel; needs a read:packages
-// token — see README) with mavenLocal first so local development against a
-// `publishToMavenLocal` of the main repo also works.
+// Repositories: GitHub Packages (the pre-Central channel; needs SOME authenticated
+// token with read:packages even for public packages — in CI the workflow's own
+// GITHUB_TOKEN, locally e.g. `gh auth token`; see README) with mavenLocal first so
+// local development against a `publishToMavenLocal` of the main repo also works.
 pluginManagement {
     // The version under test: -PbmcVersion=… (e.g. an RC), defaulting to the
     // current release line. Lives here because the project-level plugins {}
@@ -20,8 +21,7 @@ pluginManagement {
             credentials {
                 username = System.getenv("GITHUB_ACTOR")
                     ?: providers.gradleProperty("gpr.user").orNull
-                password = System.getenv("BMC4J_PACKAGES_TOKEN")
-                    ?: System.getenv("GITHUB_TOKEN")
+                password = System.getenv("GITHUB_TOKEN")
                     ?: providers.gradleProperty("gpr.token").orNull
             }
         }
@@ -39,8 +39,7 @@ dependencyResolutionManagement {
             credentials {
                 username = System.getenv("GITHUB_ACTOR")
                     ?: providers.gradleProperty("gpr.user").orNull
-                password = System.getenv("BMC4J_PACKAGES_TOKEN")
-                    ?: System.getenv("GITHUB_TOKEN")
+                password = System.getenv("GITHUB_TOKEN")
                     ?: providers.gradleProperty("gpr.token").orNull
             }
         }

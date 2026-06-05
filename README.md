@@ -18,15 +18,16 @@ So the whole assertion is: **`./gradlew test` is green.**
 ## Running
 
 CI: dispatch the **Consumer test** workflow with the version to consume — it runs
-the suite on linux, windows, and macOS. Requires the `BMC4J_PACKAGES_TOKEN` repo
-secret (a PAT with `read:packages`; plus `repo` while `bmc4j/bmc4j` is private) —
-GitHub Packages needs a token for Maven reads even on public repos.
+the suite on linux, windows, and macOS. No secrets needed: GitHub Packages requires
+*some* authenticated token for Maven reads even on public packages, and the
+workflow's own `GITHUB_TOKEN` (with `packages: read`) satisfies that for a public
+repo's packages.
 
-Locally:
+Locally (any token with `read:packages` works, e.g. `gh auth token`):
 
 ```bash
 # against GitHub Packages
-GITHUB_ACTOR=<user> BMC4J_PACKAGES_TOKEN=<pat> ./gradlew test -PbmcVersion=0.1.0
+GITHUB_ACTOR=<user> GITHUB_TOKEN=$(gh auth token) ./gradlew test -PbmcVersion=0.1.0
 
 # against a local build of the main repo
 (cd ../bmc4j && ./gradlew -p core publishToMavenLocal)
