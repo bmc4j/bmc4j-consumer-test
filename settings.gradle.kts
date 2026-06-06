@@ -7,11 +7,17 @@
 // GITHUB_TOKEN, locally e.g. `gh auth token`; see README) with mavenLocal first so
 // local development against a `publishToMavenLocal` of the main repo also works.
 pluginManagement {
-    // The version under test: -PbmcVersion=… (e.g. an RC), defaulting to the
-    // current release line. Lives here because the project-level plugins {}
-    // block only accepts constant versions.
+    // The version under test, REQUIRED via -PbmcVersion=… . Deliberately no
+    // default: this harness exists to prove a SPECIFIC version, and a dropped or
+    // typo'd property must fail loudly here, not silently green-light the release
+    // line while claiming to have tested a snapshot. Lives here because the
+    // project-level plugins {} block only accepts constant versions.
     plugins {
-        id("org.bmc4j") version (providers.gradleProperty("bmcVersion").orNull ?: "0.1.0")
+        id("org.bmc4j") version (providers.gradleProperty("bmcVersion").orNull
+                ?: throw GradleException(
+                        "Pass -PbmcVersion=<version under test> (e.g. -PbmcVersion=0.1.2 or a"
+                                + " tag-shortsha snapshot). There is no default: a silently-substituted"
+                                + " version would defeat the point of this harness."))
     }
     repositories {
         mavenLocal()
