@@ -6,6 +6,16 @@ name: Consumer test
 # (the deliberate bug declares expect = REFUTED), so a green `gradlew test` is the
 # whole assertion.
 #
+# Two ways in:
+#   - workflow_dispatch  -> manual run against an explicit `version` input.
+#   - push to snapshot/** -> the bmc4j CI pushes a `snapshot/<version>` branch
+#     (via a write deploy key, after publishing that commit's artifacts to GitHub
+#     Packages). A deploy-key push triggers `on: push` normally - the
+#     no-retrigger rule is GITHUB_TOKEN-only - so this is how the main-repo CI
+#     gates the published product with no cross-repo PAT. The version travels in
+#     the branch's single commit as bmc4j-version.txt (the branch name carries it
+#     too, as a fallback).
+#
 # No PAT needed: GitHub Packages requires SOME authenticated token for Maven reads
 # even on public packages, but for a PUBLIC repo's packages ANY token with
 # packages:read works - including this workflow's own GITHUB_TOKEN.
@@ -17,14 +27,47 @@ on:
         description: 'bmc4j version to consume (e.g. 0.1.0 or 0.1.0-rc.1)'
         required: true
         default: '0.1.0'
+  push:
+    branches:
+      - 'snapshot/**'
 
 permissions:
   contents: read
   packages: read
 
 jobs:
+  # Resolve the version under test once: from the dispatch input, or from the
+  # bmc4j-version.txt pin the snapshot-branch push carries (falling back to the
+  # branch name's snapshot/<version> suffix if the file is somehow missing).
+  resolve:
+    name: resolve version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Resolve version
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ inputs.version }}"
+          elif [ -f bmc4j-version.txt ]; then
+            version="$(tr -d '[:space:]' < bmc4j-version.txt)"
+          else
+            # Fallback: snapshot/<version> -> <version>
+            version="${GITHUB_REF_NAME#snapshot/}"
+          fi
+          [ -n "$version" ] || { echo "::error::could not resolve a bmc4j version"; exit 1; }
+          echo "Version under test: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
   consume:
     name: ${{ matrix.os }}
+    needs: resolve
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -44,9 +87,32 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Consume bmc4j ${{ inputs.version }} and run the proofs
+      - name: Consume bmc4j ${{ needs.resolve.outputs.version }} and run the proofs
         shell: bash
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew test -PbmcVersion=${{ inputs.version }} --no-daemon
+        run: ./gradlew test -PbmcVersion=${{ needs.resolve.outputs.version }} --no-daemon
+
+  # On a snapshot-branch push that proved green, delete the branch so they don't
+  # accumulate (same-repo contents:write via the run's own GITHUB_TOKEN). Failed
+  # runs keep their branch for debugging. Manual dispatches create no branch.
+  cleanup:
+    name: delete snapshot branch
+    needs: consume
+    if: ${{ github.event_name == 'push' && success() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Delete the snapshot branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ref="${GITHUB_REF_NAME}"
+          echo "Deleting branch $ref after a green run"
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${ref}" || \
+            echo "branch already gone (ok)"
