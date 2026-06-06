@@ -98,6 +98,9 @@ jobs:
       # log PROVES which artifacts were tested (downloads themselves render as transient
       # progress in modern Gradle and never persist into CI logs).
       - name: Resolved bmc4j coordinates
+        # shell: bash like every other run step - the Windows default (pwsh) mangles
+        # native args containing dots/equals (-PbmcVersion=0.1.2-... arrived as '0').
+        shell: bash
         run: ./gradlew -q dependencies --configuration testRuntimeClasspath -PbmcVersion=${{ needs.resolve.outputs.version }} --no-daemon | grep "org.bmc4j" | sort -u
 
   # On a snapshot-branch push that proved green, delete the branch so they don't
